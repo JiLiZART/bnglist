@@ -1,0 +1,44 @@
+This covers the bnglist protocol between the bnglist server and clients. All commands are sent in ASCII formats; integers are sent in their string representations. Each command is ended by a newline character. Responses that span multiple lines are ended by an "END" line and are noted.
+
+By default, the server listens on port 5872.
+
+C->S: HELLO clientversion
+	This is the first packet sent and identifies what client and version the client is running.
+S->C: HELLO serverversion
+	Response to HELLO, identifies what server and version.
+
+C->S: AUTHENTICATE
+	The authenticate command without any payload is sent to check what authentication is necessary. It also authenticates the client in the case that there is no authentication required.
+S->C: status-int
+	status=0: no further authentication is necessary (by sending authenticate, client has authenticated)
+	status=1: plain-text server passkey is required
+	status=2: plain-text username/password pair is required
+	status=3: server sends a message like "3 626e676c697374"; the second parameter is a random salt in hexadecimal format
+
+C->S: further authentication methods
+	status=1: AUTHENTICATE passkey
+	status=2: AUTHENTICATE username password
+	status=3: AUTHENTICATE username sha1(password+salt)
+S->C: SUCCESS or FAIL
+
+Now the client is authenticated; the following commands must be supported (or at least print an error message that can be parsed normally).
+
+C->S: GAMELIST
+S->C: line-separated list of games terminated by "END"
+	Each line (except END) is in the format, ID gameid-int;GAMENAME gamename;IP ip;PORT port-int;MAP mappath
+
+C->S: DETAILS gameid-int
+S->C: line-separated list of key-value pairs (separated by a space) that should contain the following in no particular order:
+	GAMENAME, IP, PORT (int), MAP, HOSTNAME, HOSTCOUNTER (int), GAMETYPE (int), MAPFLAGS (int), MAPWIDTH (int), MAPHEIGHT (int), ELAPSED (int), CRC (int)
+	The last line contains "END"
+
+C->S: COMMANDS
+S->C: space-delimited list of commands that the client can send (must include the commands here, except HELLO and AUTHENTICATE)
+
+C->S: PULL
+	This toggles whether client will receive updates to the gamelist. The action of other commands is unspecified while PULL is active. The PULL state may be irreversible (and require disconnection to reset).
+S->C: PULL mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crcstring|gamename
+	The order must be the same as above. The | are used as delimiters.
+	This will be sent every time an update is made to the gamelist.
+
+
