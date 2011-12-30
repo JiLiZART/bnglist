@@ -1,0 +1,27 @@
+This is the extended list protocol. Not all of these need to be supported by the server.
+
+C->S: PUSH mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crcstring|gamename
+	Notifies the server that the client has hosted or detected the specified game. The server may want to validate that the game is joinable by joining on the IP and port.
+
+C->S: JOIN gameid
+	Notifies the server that the client is joining the specified game.
+S->C: username-string
+	The server responds with the username (case-insensitive) that the client should use to join the game. Typically, if the JOIN command is supported, the server would ensure that the client is spoofchecked by either notifying battle.net or sending "spoofcheck" in a whisper to the hostname. If the username is an empty string, the server cannot spoofcheck the client and so the client should not join the game.
+	If the server uses the whisper method, it should wait a second to allow the client to have time to join the game.
+
+C->S: EVENTS
+	Toggles the EVENT state, which enables the client to listen to server events. These will be prefixed by a colon and shouldn't interfere with normal command ability (unlike PULL, which is unspecified).
+	
+	Note that each client should only be able to listen to one worker. This worker is decided by the server.
+S->C: SUCCESS or FAIL to check if there is an available worker for the client to listen on.
+	:CHAT message: message received in channel
+	:WHISPER user message: message received through whisper
+
+C->S: CHAT message
+	Sends the message to channel.
+
+C->S: WHISPER user message
+	Sends the message through whisper.
+
+C->S: REFRESH gameid
+	Refreshes the specified game, which should be on port 6112 and must have the same IP address as both the worker and the server.
