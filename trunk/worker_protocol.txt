@@ -5,8 +5,12 @@ By default, the server listens on port 5873.
 W->S: HELLO workerversion
 S->W: HELLO serverversion
 
-W->S: PUSH mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crc|gamename
+W->S: MODE mode
+	mode is either PUSH or 
+
+W->S: PUSH mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crc|realm|gamename
 	Pushes a game onto the server gamelist (or updates the last seen time if it's already on the list)
+	realm is the ID of the realm on the worker side (all workers should have the same realm config)
 
 S->W: SAY realm message
 	Tells the worker to queue the chat command.

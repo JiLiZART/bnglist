@@ -7,6 +7,7 @@ import java.net.Socket;
 import bnglist.Config;
 import bnglist.Games;
 import bnglist.Main;
+import bnglist.worker.WorkerServer;
 
 
 public class ListServer extends Thread {
@@ -15,6 +16,7 @@ public class ListServer extends Thread {
 	ServerSocket server;
 	Integer numConnections;
 	Games games;
+	WorkerServer workerServer;
 	
 	//config
 	int maxConnections; //maximum number of connections to allow, or 0 for unlimited
@@ -24,8 +26,8 @@ public class ListServer extends Thread {
 		this.games = games;
 		numConnections = 0;
 		
-		maxConnections = Config.getInt("max_connections", 0);
-		port = Config.getInt("port", DEFAULT_PORT);
+		maxConnections = Config.getInt("server_maxconnections", 0);
+		port = Config.getInt("server_port", DEFAULT_PORT);
 	}
 	
 	public void init() {
@@ -36,6 +38,10 @@ public class ListServer extends Thread {
 		} catch(IOException ioe) {
 			Main.println("[Server] Error while binding: " + ioe.getLocalizedMessage());
 		}
+	}
+	
+	public void setWorkerServer(WorkerServer workerServer) {
+		this.workerServer = workerServer;
 	}
 	
 	public void removeConnection() {

@@ -37,8 +37,12 @@ S->C: space-delimited list of commands that the client can send (must include th
 
 C->S: PULL
 	This toggles whether client will receive updates to the gamelist. The action of other commands is unspecified while PULL is active. The PULL state may be irreversible (and require disconnection to reset).
-S->C: PULL mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crcstring|gamename
-	The order must be the same as above. The | are used as delimiters.
-	This will be sent every time an update is made to the gamelist.
-
-
+S->C:
+	PULL ADD id|mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crc|gamename
+		The order must be the same as above. The | are used as delimiters.
+		This will be sent every time an addition is made to the gamelist.
+		Note that this does not include the realm that is present in the worker code string, but has an extra game ID.
+	PULL DELETE id
+		Sent when a game expires
+	PULL REPLACE id|mappath|hostname|ipstring|port|hostcounter|gametype|mapflags|mapwidth|mapheight|elapsedtime|crc|gamename
+		Sent when a new game with the same ipstring+port as a previous game is detected

@@ -8,9 +8,10 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import bnglist.Config;
+import bnglist.Game;
 import bnglist.Games;
 import bnglist.Main;
-import bnglist.list.ListConnection;
+import bnglist.list.ListProtocol;
 import bnglist.util.Util;
 
 
@@ -19,6 +20,7 @@ public class WorkerServer extends Thread {
 	
 	ServerSocket server;
 	Games games;
+	ArrayList<WorkerConnection> connections;
 	
 	//config
 	int port;
@@ -26,6 +28,7 @@ public class WorkerServer extends Thread {
 	
 	public WorkerServer(Games games) {
 		this.games = games;
+		connections = new ArrayList<WorkerConnection>();
 		
 		port = Config.getInt("worker_port", DEFAULT_PORT);
 		String whitelistString = Config.getString("worker_whitelist", "localhost");
@@ -65,6 +68,36 @@ public class WorkerServer extends Thread {
 		}
 	}
 	
+	public String tryJoin(Game game, int method) {
+		if(method == ListProtocol.JOIN_STANDARD) {
+			Main.println("[WorkerServer] JOIN_STANDARD is currently unsupported");
+			return null;
+		} else if(method == ListProtocol.JOIN_WHISPER) {
+			if(!game.hostName.contains("/") && !game.hostName.contains(" ")) {
+				String response = null;
+				
+				synchronized(connections) { //we don't want to find a random one and then find out it was deleted
+					int rand = (int) (Math.random() * connections.size());
+					response = connections.get(rand).sendSay(game.realm, "/w " + game.hostName + " s"); //spoof check message
+				}
+				
+				return response;
+			} else {
+				Main.println("[WorkerServer] Detected bad username [" + game.hostName + "]; aborting JOIN");
+				return null;
+			}
+		} else {
+			Main.println("[WorkerServer] Unknown join method, " + method);
+			return null;
+		}
+	}
+	
+	public void removeConnection(WorkerConnection connection) {
+		synchronized(connections) {
+			connections.remove(connection);
+		}
+	}
+	
 	public void run() {
 		while(true) {
 			try {
@@ -78,6 +111,11 @@ public class WorkerServer extends Thread {
 				
 				Main.println("[WorkerServer] New connection from " + socket.getInetAddress());
 				WorkerConnection connection = new WorkerConnection(socket, this);
+				
+				synchronized(connections) {
+					connections.add(connection);
+				}
+				
 				connection.start();
 			} catch(IOException ioe) {
 				Main.println("[WorkerServer] Error while accepting connection: " + ioe.getLocalizedMessage());

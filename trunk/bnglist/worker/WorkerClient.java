@@ -5,6 +5,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.net.Socket;
+import java.util.ArrayList;
+
+import bnglist.util.Util;
 
 public class WorkerClient extends Thread {
 	public static final int STATE_TERMINATED = -1;
@@ -19,7 +22,11 @@ public class WorkerClient extends Thread {
 	BufferedReader in;
 	PrintStream out;
 	
-	public WorkerClient() {
+	ArrayList<BnetRealm> realms;
+	
+	public WorkerClient(ArrayList<BnetRealm> realms) {
+		this.realms = realms;
+		
 		hostname = Config.getString("worker_hostname", null);
 		port = Config.getInt("worker_hostport", 5873);
 		state = STATE_INITIALIZED;
@@ -52,10 +59,15 @@ public class WorkerClient extends Thread {
 		}
 	}
 	
-	public void sendGame(IncomingGameHost game) {
+	public void sendGame(IncomingGameHost game, BnetRealm realm) {
 		if(state == STATE_CONNECTED) {
-			out.println("PUSH " + game.getCodeString());
+			out.println("PUSH " + game.getCodeString(realm));
 		}
+	}
+	
+	public void sendSay(String user) {
+		if(user == null) out.println("SAY");
+		else out.println("SAY " + user);
 	}
 	
 	public void terminate() {
@@ -83,7 +95,22 @@ public class WorkerClient extends Thread {
 					if(command.equalsIgnoreCase("HELLO")) {
 						Main.println("[Client] Received server HELLO; version: " + payload);
 					} else if(command.equalsIgnoreCase("SAY")) {
-						//todo: figure out protocol for SAY
+						String[] payloadParts = payload.split(" ", 2);
+						
+						if(payloadParts.length == 2) {
+							int realm = Util.parseInt(payloadParts[0]);
+							String chatCommand = payloadParts[1];
+							
+							String user = null;
+							for(int i = 0; i < realms.size(); i++) {
+								if(realms.get(i).id == realm) {
+									user = realms.get(i).fastChatCommand(chatCommand);
+									break;
+								}
+							}
+							
+							sendSay(user);
+						}
 					}
 				} else {
 					Main.println("[Client] Read error");

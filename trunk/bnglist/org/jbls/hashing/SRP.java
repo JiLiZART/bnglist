@@ -1,9 +1,10 @@
 package org.jbls.hashing;
 
-import worker.Util;
 import java.security.MessageDigest;
 import org.jbls.util.BigIntegerEx;
 import org.jbls.util.Buffer;
+
+import bnglist.util.Util;
 
 public class SRP
 {

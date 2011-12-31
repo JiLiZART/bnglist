@@ -7,6 +7,10 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.Queue;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import bnglist.util.Util;
 
 
 public class BnetConnection extends Thread {
@@ -27,6 +31,7 @@ public class BnetConnection extends Thread {
 	ByteBuffer buf;
 	
 	QueueThread queue;
+	Timer timer;
 	
 	String username;
 	String password;
@@ -40,6 +45,7 @@ public class BnetConnection extends Thread {
 		state = STATE_DISCONNECTED;
 		buf = ByteBuffer.allocate(65536);
 		buf.order(ByteOrder.LITTLE_ENDIAN);
+		timer = new Timer();
 		
 		username = Config.getString(getKey("username"), null);
 		password = Config.getString(getKey("password"), null);
@@ -97,12 +103,32 @@ public class BnetConnection extends Thread {
 		return true;
 	}
 	
+	public void delay(int ticks) {
+		println("[Enqueue] Delay " + ticks);
+		CommandDelay delayCommand = new CommandDelay(ticks);
+		queue.queue(delayCommand);
+	}
+	
+	public void chatCommand(String message) {
+		println("[Enqueue] " + message);
+		CommandChat chatCommand = new CommandChat(message);
+		queue.queue(chatCommand);
+	}
+	
+	public void joinChannel(String channel) {
+		println("[Enqueue] Joining channel " + channel);
+		CommandJoinChannel joinCommand = new CommandJoinChannel(channel);
+		queue.queue(joinCommand);
+	}
+	
 	public void terminate(String reason) {
 		if(reason == null) reason = "unknown";
 		
 		println("Terminating connection: " + reason);
 		state = STATE_TERMINATED;
 
+		queue.terminate();
+		
 		try {
 			socket.close();
 		} catch(IOException e) {}
@@ -187,9 +213,16 @@ public class BnetConnection extends Thread {
 						println("Starting queue thread");
 						queue = new QueueThread(this);
 						queue.start();
+						
+						//start listing games 5 seconds from now, every 20 seconds
+						timer.schedule(new EnqueueGamelist(this), 5000, 20000);
 					} else {
 						println("logon failed - invalid password, disconnecting");
 						terminate("logon failed");
+					}
+				} else if(packetType == BnetProtocol.SID_ENTERCHAT) {
+					if(protocol.receiveEnterChat(buf, dataLength)) {
+						joinChannel(Config.getString(getKey("firstchannel"), "The Void"));
 					}
 				} else if(packetType == BnetProtocol.SID_GETADVLISTEX) {
 					ArrayList<IncomingGameHost> games = protocol.receiveGetAdvListex3(buf, dataLength);
@@ -198,11 +231,15 @@ public class BnetConnection extends Thread {
 						println("Submitting " + games.size() + " games");
 						
 						for(IncomingGameHost game : games) {
-							realm.client.sendGame(game);
+							realm.client.sendGame(game, realm);
 						}
 					}
 				}
 			} catch(IOException ioe) {
+				if(Main.DEBUG) {
+					ioe.printStackTrace();
+				}
+				
 				println("Socket error: " + ioe.getLocalizedMessage());
 				terminate("socket error");
 			}
@@ -210,13 +247,28 @@ public class BnetConnection extends Thread {
 	}
 }
 
+class EnqueueGamelist extends TimerTask {
+	BnetConnection target;
+	
+	public EnqueueGamelist(BnetConnection target) {
+		this.target = target;
+	}
+	
+	public void run() {
+		target.println("[Enqueue] Game list update");
+		target.queue.queue(new CommandList("", 20));
+	}
+}
+
 class QueueThread extends Thread {
+	boolean terminate;
 	BnetConnection connection;
 	Queue<QueueCommand> commands;
 	
 	public QueueThread(BnetConnection connection) {
 		this.connection = connection;
 		commands = new LinkedList<QueueCommand>();
+		terminate = false;
 	}
 	
 	public void queue(QueueCommand command) {
@@ -232,26 +284,44 @@ class QueueThread extends Thread {
 	
 	public void execute(QueueCommand command) throws IOException {
 		if(command.type == QueueCommand.COMMAND_CHAT) {
-			
+			CommandChat chatCommand = (CommandChat) command;
+			connection.protocol.sendChatCommand(chatCommand.message);
+		} else if(command.type == QueueCommand.COMMAND_JOINCHANNEL) {
+			CommandJoinChannel joinCommand = (CommandJoinChannel) command;
+			connection.protocol.sendJoinChannel(joinCommand.channel);
 		} else if(command.type == QueueCommand.COMMAND_LIST) {
 			CommandList listCommand = (CommandList) command;
 			connection.protocol.sendGetAdvListex3(listCommand.gamename, listCommand.numGames);
+		} else if(command.type == QueueCommand.COMMAND_DELAY) {
+			//do nothing
 		}
 	}
 	
+	public int size() {
+		return commands.size();
+	}
+	
+	public void terminate() {
+		terminate = true;
+	}
+	
 	public void run() {
-		while(true) {
-			QueueCommand command;
-			
-			if(!commands.isEmpty()) {
-				synchronized(commands) {
-					command = commands.poll();
+		//queue is just starting, wait a bit
+		try {
+			Thread.sleep(2000);
+		} catch(InterruptedException e) {}
+		
+		while(!terminate) {
+			synchronized(commands) {
+				while(commands.isEmpty()) {
+					try {
+						commands.wait();
+					} catch(InterruptedException e) {}
 				}
-			} else {
-				Main.println("[Queue] Empty queue, getting game list instead");
-				command = new CommandList("", 20);
 			}
-				
+			
+			QueueCommand command = commands.poll();
+			
 			try {
 				execute(command);
 			} catch(IOException e) {
@@ -270,7 +340,9 @@ class QueueThread extends Thread {
 
 class QueueCommand {
 	public static final int COMMAND_CHAT = 0;
+	public static final int COMMAND_JOINCHANNEL = 1;
 	public static final int COMMAND_LIST = 2;
+	public static final int COMMAND_DELAY = 3;
 	
 	int type;
 	
@@ -298,6 +370,19 @@ class CommandWhisper extends CommandChat {
 	}
 }
 
+class CommandJoinChannel extends QueueCommand {
+	String channel;
+	
+	public CommandJoinChannel(String channel) {
+		type = COMMAND_JOINCHANNEL;
+		this.channel = channel;
+	}
+	
+	public int getWaitTicks() {
+		 return 1000;
+	}
+}
+
 class CommandList extends QueueCommand {
 	String gamename;
 	int numGames;
@@ -309,6 +394,19 @@ class CommandList extends QueueCommand {
 	}
 	
 	public int getWaitTicks() {
-		return 20000;
+		return 3000;
+	}
+}
+
+class CommandDelay extends QueueCommand {
+	int delay;
+	
+	public CommandDelay(int delay) {
+		type = COMMAND_DELAY;
+		this.delay = delay;
+	}
+	
+	public int getWaitTicks() {
+		return delay;
 	}
 }

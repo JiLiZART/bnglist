@@ -4,6 +4,9 @@ package worker;
 import org.jbls.hashing.HashException;
 import org.jbls.hashing.HashMain;
 import org.jbls.hashing.SRP;
+
+import bnglist.util.Util;
+
 import java.io.File;
 
 public class BNCSUtilInterface {
