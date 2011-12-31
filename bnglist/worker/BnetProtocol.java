@@ -5,6 +5,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 
+import bnglist.util.Util;
+
 
 public class BnetProtocol {
 	public static final int BNET_HEADER_CONSTANT = 255;
@@ -51,7 +53,7 @@ public class BnetProtocol {
 	byte[] keyStateDescription;	// set in RECEIVE_SID_AUTH_CHECK
 	byte[] salt; // set in RECEIVE_SID_AUTH_ACCOUNTLOGON
 	byte[] serverPublicKey; // set in RECEIVE_SID_AUTH_ACCOUNTLOGON
-	byte[] uniqueName; // set in RECEIVE_SID_ENTERCHAT
+	String uniqueName; // set in RECEIVE_SID_ENTERCHAT
 	
 	public BnetProtocol(LittleEndianDataInputStream in, LittleEndianDataOutputStream out) {
 		this.in = in;
@@ -100,9 +102,13 @@ public class BnetProtocol {
 		return new String(keyStateDescription);
 	}
 	
+	public String getUniqueName() {
+		return uniqueName;
+	}
+	
 	//receive functions (buf and length do not include the header)
 	
-	public int receivePing(ByteBuffer buf, int length) throws IOException {
+	public int receivePing(ByteBuffer buf, int length) {
 		if(length >= 4) {
 			return buf.getInt();
 		} else {
@@ -110,7 +116,7 @@ public class BnetProtocol {
 		}
 	}
 	
-	public boolean receiveAuthInfo(ByteBuffer buf, int length) throws IOException {
+	public boolean receiveAuthInfo(ByteBuffer buf, int length) {
 		if(length >= 21) {
 			buf.get(logonType); //4 bytes
 			buf.get(serverToken); //4 bytes
@@ -125,7 +131,7 @@ public class BnetProtocol {
 		}
 	}
 	
-	public boolean receiveAuthCheck(ByteBuffer buf, int length) throws IOException {
+	public boolean receiveAuthCheck(ByteBuffer buf, int length) {
 		if(length >= 5) {
 			buf.get(keyState); //4 bytes
 			keyStateDescription = Util.getTerminatedArray(buf, length);
@@ -135,7 +141,7 @@ public class BnetProtocol {
 		}
 	}
 	
-	public boolean receiveAuthAccountLogon(ByteBuffer buf, int length) throws IOException {
+	public boolean receiveAuthAccountLogon(ByteBuffer buf, int length) {
 		if(length >= 68) {
 			int status = buf.getInt();
 			
@@ -151,7 +157,7 @@ public class BnetProtocol {
 		}
 	}
 	
-	public boolean receiveAuthAccountLogonProof(ByteBuffer buf, int length) throws IOException {
+	public boolean receiveAuthAccountLogonProof(ByteBuffer buf, int length) {
 		if(length >= 4) {
 			int status = buf.getInt();
 			
@@ -160,6 +166,15 @@ public class BnetProtocol {
 			} else {
 				return false;
 			}
+		} else {
+			return false;
+		}
+	}
+	
+	public boolean receiveEnterChat(ByteBuffer buf, int length) {
+		if(length >= 1) {
+			uniqueName = Util.getTerminatedString(buf, length);
+			return true;
 		} else {
 			return false;
 		}
@@ -316,6 +331,29 @@ public class BnetProtocol {
 		out.write(0); //account name is null on Warcraft III
 		out.write(0); //stat string is null on cdkey products
 	}
+	
+	public void sendJoinChannel(String channel) throws IOException {
+		byte[] NoCreateJoin = new byte[] {2, 0, 0, 0};
+		byte[] FirstJoin = new byte[] {1, 0, 0, 0};
+		
+		out.write(BNET_HEADER_CONSTANT);
+		out.write(SID_JOINCHANNEL);
+		out.writeShort(8 + channel.length() + 1);
+		
+		if(channel.length() > 0)
+			out.write(NoCreateJoin);
+		else
+			out.write(FirstJoin);
+		
+		out.writeTerminatedString(channel);
+	}
+	
+	public void sendChatCommand(String command) throws IOException {
+		out.write(BNET_HEADER_CONSTANT);
+		out.write(SID_CHATCOMMAND);
+		out.writeShort(4 + command.length() + 1);
+		out.writeTerminatedString(command);
+	}
 
 	public void sendStartAdvex3(int state, byte[] mapGameType, String gameName, int upTime, int hostcounter, byte[] statString) throws IOException {
 		byte[] Unknown = new byte[] {(byte) 255, 3, 0, 0};
@@ -447,9 +485,9 @@ class IncomingGameHost
 		}
 	}
 	
-	public String getCodeString() {
+	public String getCodeString(BnetRealm realm) {
 		return mapPath + "|" + hostName + "|" + Util.ipString(ip) + "|" +
 		port + "|" + hostCounter + "|" + gameType + "|" + mapFlags + "|" + mapWidth + "|" +
-		mapHeight + "|" + elapsedTime + "|" + mapCRC + "|" + gameName;
+		mapHeight + "|" + elapsedTime + "|" + mapCRC + "|" + realm.id + "|" + gameName;
 	}
 }

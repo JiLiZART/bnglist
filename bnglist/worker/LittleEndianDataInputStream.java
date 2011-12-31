@@ -31,7 +31,7 @@ public class LittleEndianDataInputStream extends FilterInputStream implements Da
   public int readUnsignedByte() throws IOException {
     int b1 = in.read();
     if (0 > b1) {
-      throw new EOFException();
+      throw new EOFException("end of stream reached");
     }
     
     return b1;

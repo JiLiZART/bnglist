@@ -11,6 +11,7 @@ import bnglist.worker.WorkerServer;
 public class Main {
 	public static String BNGLIST_VERSION = "bnglist 0 (http://code.google.com/p/bnglist/)";
 	public static File logTarget = null;
+	public static boolean DEBUG = true;
 	
 	public static void main(String args[]) {
 		println(BNGLIST_VERSION);
@@ -54,6 +55,8 @@ public class Main {
 			WorkerServer workerServer = new WorkerServer(games);
 			workerServer.init();
 			workerServer.start();
+			
+			server.setWorkerServer(workerServer);
 		}
 	}
 	

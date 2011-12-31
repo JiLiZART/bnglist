@@ -9,6 +9,7 @@ import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 
 import bnglist.Main;
 
@@ -120,18 +121,31 @@ public class Util {
 		int len = s.length();
 		
 		byte[] data = new byte[len / 2];
-		for (int i = 0; i < len; i += 2) {
+		for (int i = 0; i < len - 1; i += 2) {
 			data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
 								 + Character.digit(s.charAt(i+1), 16));
 		}
 		
 		return data;
 	}
+	
+	public static long unsignedInt(int x) {
+		byte[] array = toBytes(x); //this actually reverses the int, we'll have to unreverse
+		int b1 = (0x000000FF & ((int)array[3]));
+		int b2 = (0x000000FF & ((int)array[2]));
+		int b3 = (0x000000FF & ((int)array[1]));
+		int b4 = (0x000000FF & ((int)array[0]));
+		return ((long) (b1 << 24
+						| b2 << 16
+						| b3 << 8
+						| b4))
+						& 0xFFFFFFFFL;
+	}
 
 	public static int unsignedShort(short s) {
-		byte[] array = toBytes(s);
-		int b1 = (0x000000FF & ((int) array[0]));
-		int b2 = (0x000000FF & ((int) array[1]));
+		byte[] array = toBytes(s); //this actually reverses the short, we'll have to unreverse
+		int b1 = (0x000000FF & ((int) array[1]));
+		int b2 = (0x000000FF & ((int) array[0]));
 		return (b1 << 8 | b2);
 	}
 
@@ -169,6 +183,16 @@ public class Util {
 			return null;
         }
 	}
+	
+	public static byte[] getSha1Result(byte[] bytes) {
+		MessageDigest sha1 = getSha1Digest();
+		return sha1.digest(bytes);
+	}
+	
+	public static String getSha1Result(String str) {
+		byte[] result = getSha1Result(toBytes(str));
+		return getHex(result);
+	}
 
 	public static String readTerminatedString(InputStream in) {
 		try {
@@ -194,6 +218,58 @@ public class Util {
 			bytes[i] = (byte) Integer.parseInt(parts[i]);
 		}
 		
+		return bytes;
+	}
+	
+	public static ByteBuffer decodeStatString( byte[] data )
+	{
+		byte Mask = 0;
+		ByteBuffer result = ByteBuffer.allocate(data.length);
+
+		for(int i = 0; i < data.length; i++)
+		{
+			if( ( i % 8 ) == 0 )
+				Mask = data[i];
+			else
+			{
+				if( ( Mask & ( 1 << ( i % 8 ) ) ) == 0 )
+					result.put( (byte) (data[i] - 1) );
+				else
+					result.put( data[i] );
+			}
+		}
+		
+		return result;
+	}
+	
+	public static void reverse(byte[] data) {
+		for(int i = 0; i < data.length / 2; i++) {
+			byte tmp = data[i];
+			data[i] = data[data.length - 1 -  i];
+			data[data.length - 1 - i] = tmp;
+		}
+	}
+	
+	public static String ipString(byte[] ip) {
+		if(ip.length < 4) return null;
+		else return unsignedByte(ip[0]) + "." +
+			unsignedByte(ip[1]) + "." +
+			unsignedByte(ip[2]) + "." +
+			unsignedByte(ip[3]);
+	}
+	
+	public static int parseInt(String str) {
+		try {
+			return Integer.parseInt(str);
+		} catch(NumberFormatException e) {
+			return 0;
+		}
+	}
+	
+	public static SecureRandom RANDOM = new SecureRandom();
+	public static byte[] randomBytes(int num) {
+		byte[] bytes = new byte[num];
+		RANDOM.nextBytes(bytes);
 		return bytes;
 	}
 }

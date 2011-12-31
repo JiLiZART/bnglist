@@ -1,20 +1,23 @@
 package bnglist;
 
+import bnglist.util.Util;
+
 public class Game {
-	String mapPath;
-	String hostName;
-	String ipString;
-	int port;
-	int hostCounter;
-	int gameType;
-	int mapFlags;
-	int mapWidth;
-	int mapHeight;
-	int elapsedTime;
-	int mapCRC;
-	String gameName;
+	public String mapPath;
+	public String hostName;
+	public String ipString;
+	public int port;
+	public int hostCounter;
+	public int gameType;
+	public int mapFlags;
+	public int mapWidth;
+	public int mapHeight;
+	public int elapsedTime;
+	public int mapCRC;
+	public String gameName;
 	
-	long seenTime;
+	public long seenTime;
+	public int realm;
 	
 	private Game() {
 		
@@ -37,14 +40,29 @@ public class Game {
 			"\nPORT " + port +
 			"\nMAP " + mapPath +
 			"\nHOSTNAME " + hostName +
-			"\nHOSTCOUNTER " + hostCounter +
+			"\nHOSTCOUNTER " + Util.unsignedInt(hostCounter) +
 			"\nGAMETYPE " + gameType + 
-			"\nMAPFLAGS " + mapFlags +
+			"\nMAPFLAGS " + Util.unsignedInt(mapFlags) +
 			"\nMAPWIDTH " + mapWidth +
 			"\nMAPHEIGHT " + mapHeight +
-			"\nELAPSED " + elapsedTime +
-			"\nCRC " + mapCRC +
+			"\nELAPSED " + Util.unsignedInt(elapsedTime) +
+			"\nCRC " + Util.unsignedInt(mapCRC) +
 			"\nEND";
+	}
+	
+	public String getCodeString() {
+		return mapPath + "|" +
+			hostName + "|" +
+			ipString + "|" +
+			port + "|" +
+			Util.unsignedInt(hostCounter) + "|" +
+			gameType + "|" +
+			Util.unsignedInt(mapFlags) + "|" +
+			mapWidth + "|" +
+			mapHeight + "|" +
+			Util.unsignedInt(elapsedTime) + "|" +
+			Util.unsignedInt(mapCRC) + "|" +
+			gameName;
 	}
 	
 	public String toString() {
@@ -55,9 +73,9 @@ public class Game {
 		try {
 			Game game = new Game();
 			
-			String[] parts = input.split("\\|", 12);
+			String[] parts = input.split("\\|", 13);
 			
-			if(parts.length < 12) return null;
+			if(parts.length < 13) return null;
 			
 			game.mapPath = parts[0];
 			game.hostName = parts[1];
@@ -70,7 +88,8 @@ public class Game {
 			game.mapHeight = Integer.parseInt(parts[8]);
 			game.elapsedTime = Integer.parseInt(parts[9]);
 			game.mapCRC = Integer.parseInt(parts[10]);
-			game.gameName = parts[11];
+			game.realm = Integer.parseInt(parts[11]);
+			game.gameName = parts[12];
 			
 			game.seenTime = seenTime;
 			

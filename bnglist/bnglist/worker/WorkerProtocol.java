@@ -14,17 +14,21 @@ public class WorkerProtocol {
 	
 	BufferedReader in;
 	PrintStream out;
-	Games games;
+	WorkerConnection connection;
 	int state;
 	
-	public WorkerProtocol(BufferedReader in, PrintStream out, Games games) {
+	public WorkerProtocol(BufferedReader in, PrintStream out, WorkerConnection connection) {
 		this.in = in;
 		this.out = out;
-		this.games = games;
+		this.connection = connection;
 	}
 	
 	public void sendHello() {
 		out.println("HELLO " + Main.BNGLIST_VERSION);
+	}
+	
+	public void sendSay(int realm, String message) {
+		out.println("SAY " + realm + " " + message);
 	}
 	
 	public boolean handleCommand() throws IOException {
@@ -52,10 +56,17 @@ public class WorkerProtocol {
 			}
 		} else if(state == STATE_HELLO) {
 			if(command.equalsIgnoreCase("PUSH")) {
-				games.addGame(payload);
+				connection.server.games.addGame(payload);
 				return true;
 			} else if(command.equalsIgnoreCase("EVENT")) {
 				//todo
+				return true;
+			} else if(command.equalsIgnoreCase("SAY")) {
+				synchronized(connection.sayWait) {
+					connection.sayResponse = payload;
+					connection.sayWait.notify();
+				}
+				
 				return true;
 			}
 		}

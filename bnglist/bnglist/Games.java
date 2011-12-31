@@ -10,6 +10,7 @@ public class Games extends Thread {
 	HashMap<String, Integer> idFromHash; //maps from game hash to the game ID
 	
 	String gamelistString; //latest gamelist string that is sent to clients on GAMELIST
+	ArrayList<GameUpdateListener> listeners;
 	
 	//config
 	int maxGames; //maximum number of games to store
@@ -19,18 +20,25 @@ public class Games extends Thread {
 		nextId = 0;
 		games = new HashMap<Integer, Game>();
 		idFromHash = new HashMap<String, Integer>();
+		listeners = new ArrayList<GameUpdateListener>();
 		
 		//config
 		maxGames = Config.getInt("max_games", 0);
 		keepTime = Config.getInt("keep_time", 30000);
 	}
 	
+	public void registerListener(GameUpdateListener listener) {
+		listeners.add(listener);
+	}
+	
+	public void deregisterListener(GameUpdateListener listener) {
+		listeners.remove(listener);
+	}
+	
 	public void addGame(Game game) {
-		int gid;
+		int gid = -1;
 		
 		synchronized(idFromHash) {
-			gid = nextId;
-			
 			//delete old game with the hash if existing
 			
 			//old game might still be null if we deleted it elsewhere at the same time somehow
@@ -38,6 +46,7 @@ public class Games extends Thread {
 			// if we deleted then this would be an ADD
 			Game oldGame = null;
 			if(idFromHash.containsKey(game.getHashString())) {
+				//we don't delete the old entry because we might reuse the ID
 				int oldGid = idFromHash.get(game.getHashString());
 				
 				synchronized(games) {
@@ -46,26 +55,39 @@ public class Games extends Thread {
 				
 				//here we check if this is a replace or an update
 				if(oldGame != null) {
+					gid = oldGid; //reuse the game ID
+					
 					if(oldGame.hostCounter != game.hostCounter) {
 						Main.println("[Games] REPLACE " + oldGid + " " + game.getOverviewString());
-					} else {
-						Main.println("[Games] UPDATE " + oldGid + " " + gid);
+						
+						for(int i = 0; i < listeners.size(); i++) {
+							listeners.get(i).gameReplaced(gid, game);
+						}
 					}
 				}
-				
-				//don't delete from idFromHash since we're overwriting it anyway
 			}
 			
 			//check if this was an ADD
+			// in this case, we create a new ID for the game
 			if(oldGame == null) {
+				gid = nextId;
+				nextId++;
+				
 				Main.println("[Games] ADD " + gid + " " + game.getOverviewString());
+				
+				for(int i = 0; i < listeners.size(); i++) {
+					listeners.get(i).gameAdded(gid, game);
+				}
+				
+				idFromHash.put(game.getHashString(), gid);
 			}
-			
-			idFromHash.put(game.getHashString(), gid);
-			nextId++;
 		}
 		
 		synchronized(games) {
+			if(gid == -1) { //this should never occur
+				Main.println("[Games] Error: gid=-1");
+			}
+			
 			games.put(gid, game);
 		}
 	}
@@ -97,6 +119,10 @@ public class Games extends Thread {
 					
 					doDelete.add(hash);
 					Main.println("[Games] DELETE " + gid);
+
+					for(int i = 0; i < listeners.size(); i++) {
+						listeners.get(i).gameDeleted(gid);
+					}
 				}
 			}
 			
@@ -134,8 +160,12 @@ public class Games extends Thread {
 		if(game != null) {
 			return game.getDetailString();
 		} else {
-			return null;
+			return "unknown game id";
 		}
+	}
+	
+	public Game getGame(int gid) {
+		return games.get(gid);
 	}
 	
 	public void run() {

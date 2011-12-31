@@ -8,6 +8,7 @@ import java.util.ArrayList;
 public class Main {
 	public static String BNGLIST_VERSION = "bnglist-worker 0 (http://code.google.com/p/bnglist/)";
 	public static File logTarget = null;
+	public static boolean DEBUG = true;
 	
 	public static void main(String args[]) {
 		println(BNGLIST_VERSION);
@@ -22,11 +23,11 @@ public class Main {
 		
 		println("[Main] Starting up");
 		
-		WorkerClient client = new WorkerClient();
+		ArrayList<BnetRealm> realms = new ArrayList<BnetRealm>();
+		WorkerClient client = new WorkerClient(realms);
 		client.init();
 		client.start();
 		
-		ArrayList<BnetRealm> realms = new ArrayList<BnetRealm>();
 		//search for bnet realms and their connections
 		for(int i = -1; i < 16; i++) {
 			String prefix = "realm" + i + "_";
